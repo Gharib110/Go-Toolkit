@@ -30,6 +30,12 @@ var uploadTests = []struct {
 	{name: "Allowed no rename",
 		allowedFileTypes: []string{"image/jpeg", "image/png", "image/gif"},
 		renameFile:       false, errExpected: false},
+	{name: "Allowed rename",
+		allowedFileTypes: []string{"image/jpeg", "image/png", "image/gif"},
+		renameFile:       true, errExpected: false},
+	{name: "Not Allowed",
+		allowedFileTypes: []string{"image/jpeg"},
+		renameFile:       false, errExpected: true},
 }
 
 func TestTools_UploadFiles(t *testing.T) {
@@ -101,5 +107,65 @@ func TestTools_UploadFiles(t *testing.T) {
 			return
 		}
 		wg.Wait()
+	}
+}
+
+func TestTools_UploadOneFile(t *testing.T) {
+	for _ = range uploadTests {
+		pr, pw := io.Pipe()
+		writer := multipart.NewWriter(pw)
+
+		go func() {
+			defer writer.Close()
+
+			part, err := writer.CreateFormFile("file",
+				"./test_data/test.jpg")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
+			f, err := os.Open("./test_data/test.jpg")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer f.Close()
+			img, _, err := image.Decode(f)
+			if err != nil {
+				t.Error("Error decoding image", err)
+				return
+			}
+
+			err = png.Encode(part, img)
+			if err != nil {
+				t.Error("Error encoding image", err)
+				return
+			}
+		}()
+
+		req, err := http.NewRequest("POST", "/", pr)
+		req.Header.Add("Content-Type", writer.FormDataContentType())
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var testTools Tools
+
+		uploadedFiles, err := testTools.UploadOneFile(req,
+			"./test_data/uploads",
+			true)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if _, err := os.Stat(fmt.Sprintf("./test_data/uploads/%s",
+			uploadedFiles.NewFileName)); os.IsNotExist(err) {
+			t.Error("File not found in uploads folder")
+			return
+		}
+		_ = os.Remove(fmt.Sprintf("./test_data/uploads/%s", uploadedFiles.NewFileName))
+
 	}
 }
