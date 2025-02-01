@@ -1,8 +1,10 @@
 package toolkit
 
 type Tools struct {
-	MaxFileSize      int
-	AllowedFileTypes []string
+	MaxFileSize        int
+	AllowedFileTypes   []string
+	MaxJSONSize        int
+	AllowUnknownFields bool
 }
 
 // UploadedFile represents a file that has been uploaded.
